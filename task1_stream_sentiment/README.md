@@ -14,7 +14,7 @@ Google Play ──► producer.py ──► Kafka (топик reviews.raw) ─�
 
 | Компонент | Файл | Что делает |
 | --- | --- | --- |
-| Брокер сообщений | `docker-compose.yml` | Kafka 3.8 в режиме KRaft, порт 9092 |
+| Брокер сообщений | `docker-compose.yml` | Kafka 3.8 в режиме KRaft, порт 19092 |
 | Продюсер | `producer.py` | Забирает отзывы через `google-play-scraper` и публикует их в Kafka |
 | Консьюмер | `consumer.py` | Читает топик пачками, размечает тональность, пишет в базу |
 | Модель | `sentiment.py` | [`cointegrated/rubert-tiny-sentiment-balanced`](https://huggingface.co/cointegrated/rubert-tiny-sentiment-balanced), классы negative / neutral / positive |
@@ -92,6 +92,16 @@ python evaluate.py
 
 Всё задаётся в `config.py` или переменными окружения: другое приложение
 (`APP_ID=ru.sberbankmobile`), адрес Kafka (`KAFKA_BOOTSTRAP`), модель (`MODEL_NAME`).
+
+Kafka слушает порт **19092**, а не стандартный 9092: тот часто занят другими проектами.
+Если занят и 19092, задайте другой порт переменной `KAFKA_PORT` — одинаково для
+`docker compose` и для скриптов:
+
+```bash
+export KAFKA_PORT=29092        # Windows (PowerShell): $env:KAFKA_PORT="29092"
+docker compose up -d
+python consumer.py
+```
 
 ## Источник данных
 

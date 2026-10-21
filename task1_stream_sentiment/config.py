@@ -8,7 +8,9 @@ DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 # Kafka
-KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
+# порт должен совпадать с docker-compose.yml; 9092 не используем — он часто занят
+KAFKA_PORT = os.getenv("KAFKA_PORT", "19092")
+KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", f"localhost:{KAFKA_PORT}")
 TOPIC_REVIEWS = os.getenv("TOPIC_REVIEWS", "reviews.raw")
 CONSUMER_GROUP = os.getenv("CONSUMER_GROUP", "sentiment-analyzer")
 
