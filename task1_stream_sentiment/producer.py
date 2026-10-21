@@ -55,7 +55,8 @@ def to_message(r: dict, source: str) -> dict:
     """Приводит отзыв Google Play к формату сообщения в топике."""
     published = r["at"]
     if isinstance(published, datetime):
-        published = published.replace(tzinfo=published.tzinfo or timezone.utc).isoformat()
+        # библиотека отдаёт локальное время без зоны; astimezone считает его локальным
+        published = published.astimezone(timezone.utc).isoformat()
     return {
         "review_id": str(r["reviewId"]),
         "published_at": str(published),
@@ -102,6 +103,7 @@ def cmd_collect(args):
         time.sleep(1)  # бережём источник
     df = pd.DataFrame(rows).drop_duplicates("review_id")
     df = df[df["content"].str.len() > 0]
+    df = df.head(args.count)  # с токеном продолжения библиотека может вернуть больше, чем просили
     df.to_csv(config.REPLAY_CSV, index=False)
     print(f"Сохранено {len(df)} отзывов в {config.REPLAY_CSV}")
 

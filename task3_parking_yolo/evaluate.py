@@ -25,10 +25,18 @@ def extract(args):
     frames_dir.mkdir(parents=True, exist_ok=True)
     cap = cv2.VideoCapture(str(src))
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total <= 0:  # некоторые контейнеры не сообщают число кадров — считаем вручную
+        while cap.grab():
+            total += 1
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    if total <= 0:
+        raise SystemExit(f"Не удалось прочитать кадры из видео: {src}")
     stride = args.stride
     # берём кадры, кратные stride, чтобы они совпадали с обработанными в count_cars.py
     candidates = np.arange(0, total, stride)
-    picks = candidates[np.linspace(0, len(candidates) - 1, args.n).astype(int)]
+    picks = np.unique(candidates[np.linspace(0, len(candidates) - 1, args.n).astype(int)])
+    for old in frames_dir.glob("frame_*.jpg"):  # кадры от прошлого запуска с другими --n/--stride
+        old.unlink()
     for idx in picks:
         cap.set(cv2.CAP_PROP_POS_FRAMES, int(idx))
         ok, frame = cap.read()
@@ -36,6 +44,11 @@ def extract(args):
             cv2.imwrite(str(frames_dir / f"frame_{idx:06d}.jpg"), frame)
     cap.release()
     gt = out_dir / "ground_truth.csv"
+    if gt.exists() and list(pd.read_csv(gt)["frame"]) != list(picks):
+        # набор кадров изменился: старую разметку не теряем, но и не оставляем рассинхронизированной
+        backup = gt.with_name("ground_truth.bak.csv")
+        gt.replace(backup)
+        print(f"Набор кадров изменился, прежняя разметка сохранена в {backup}")
     if not gt.exists():
         pd.DataFrame({"frame": picks, "true_count": ""}).to_csv(gt, index=False)
     print(f"Кадры: {frames_dir}\nЗаполните true_count в {gt}")
@@ -45,17 +58,25 @@ def score(args):
     src = Path(args.source)
     out_dir = Path(args.out) / src.stem
     pred = pd.read_csv(out_dir / "counts.csv")
-    gt = pd.read_csv(out_dir / "ground_truth.csv").dropna(subset=["true_count"])
+    gt_path = out_dir / "ground_truth.csv"
+    gt = pd.read_csv(gt_path).dropna(subset=["true_count"])
+    if gt.empty:
+        raise SystemExit(f"Колонка true_count не заполнена. Посчитайте машины на кадрах и впишите в {gt_path}")
     df = gt.merge(pred[["frame", "in_roi"]], on="frame", how="inner")
     if df.empty:
         raise SystemExit("Нет совпадающих кадров. Используйте одинаковый --stride в count_cars.py и evaluate.py")
+    if len(df) < len(gt):
+        print(f"Внимание: не учтено размеченных кадров, которых нет в counts.csv: {len(gt) - len(df)}. "
+              "Проверьте, что --stride в count_cars.py и evaluate.py одинаковый.")
 
     err = df["in_roi"] - df["true_count"]
     nonzero = df["true_count"] > 0
     metrics = {
         "frames": int(len(df)),
         "MAE": round(float(err.abs().mean()), 3),
-        "MAPE_%": round(float((err[nonzero].abs() / df.loc[nonzero, "true_count"]).mean() * 100), 2),
+        # MAPE считается только по кадрам, где машины есть; если таких нет — null
+        "MAPE_%": round(float((err[nonzero].abs() / df.loc[nonzero, "true_count"]).mean() * 100), 2)
+        if nonzero.any() else None,
         "bias": round(float(err.mean()), 3),  # < 0 — модель недосчитывает
         "within_1_%": round(float((err.abs() <= 1).mean() * 100), 1),
         "exact_%": round(float((err == 0).mean() * 100), 1),

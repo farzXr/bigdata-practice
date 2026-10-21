@@ -98,13 +98,14 @@ def live_view():
             st.altair_chart(
                 alt.Chart(wdf)
                 .mark_bar(color=COLORS["negative"])
-                .encode(x="Отзывов:Q", y=alt.Y("Слово:N", sort="-x"))
-                .properties(height=360),
+                .encode(x="Отзывов:Q", y=alt.Y("Слово:N", sort="-x", axis=alt.Axis(labelOverlap=False)))
+                .properties(height=max(200, 26 * len(wdf))),  # по строке на слово, иначе подписи прячутся
                 use_container_width=True,
             )
     with right:
         st.subheader("Последние отзывы")
-        last = df.sort_values("processed_at", ascending=False).head(15)
+        # у одной пачки processed_at одинаковый, поэтому внутри неё сортируем по времени публикации
+        last = df.sort_values(["processed_at", "published_at"], ascending=False).head(15)
         st.dataframe(
             last.assign(Тональность=last["label"].map(NAMES))[
                 ["published_at", "score", "Тональность", "confidence", "content"]

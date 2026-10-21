@@ -22,3 +22,6 @@ task3_parking_yolo/runs/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Логи Playwright MCP
+.playwright-mcp/

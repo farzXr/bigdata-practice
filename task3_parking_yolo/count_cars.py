@@ -77,7 +77,7 @@ def run(args) -> Path:
 
     device = pick_device(args.device)
     model = YOLO(args.model)
-    print(f"Видео: {src.name}, {w}x{h}, {fps:.0f} к/с, {n_frames} кадров. Устройство: {device}")
+    print(f"Видео: {src.name}, {w}x{h}, {fps:.4g} к/с, {n_frames} кадров. Устройство: {device}")
 
     rows, seen_ids = [], set()
     frame_idx, t0 = -1, time.time()
