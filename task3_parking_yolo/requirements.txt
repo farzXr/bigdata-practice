@@ -1,0 +1,6 @@
+ultralytics>=8.2
+opencv-python>=4.9
+pandas>=2.1
+numpy>=1.26
+matplotlib>=3.8
+jupyter
