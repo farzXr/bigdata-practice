@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Данные и результаты (создаются при запуске)
+task1_stream_sentiment/data/*
+!task1_stream_sentiment/data/.gitkeep
+task2_occupancy_ml/data/
+task3_parking_yolo/videos/
+task3_parking_yolo/out/
+task3_parking_yolo/runs/
+*.pt
+*.mp4
+*.avi
+*.mov
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
