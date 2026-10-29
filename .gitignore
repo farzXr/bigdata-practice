@@ -27,3 +27,6 @@ Thumbs.db
 
 # Логи Playwright MCP
 .playwright-mcp/
+
+# Конспекты к защите (личные заметки, не для репозитория)
+defense/
