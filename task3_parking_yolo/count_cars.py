@@ -51,11 +51,35 @@ def parse_roi(text: str | None, w: int, h: int):
     if not text:
         return None
     pts = [tuple(map(float, p.split(","))) for p in text.split(";")]
-    return np.array([[int(x * w), int(y * h)] for x, y in pts], dtype=np.int32)
+    # точки на самой границе кадра (1.0) сдвигаем внутрь, иначе контур зоны не виден
+    return np.array([[min(int(x * w), w - 2), min(int(y * h), h - 2)] for x, y in pts], dtype=np.int32)
 
 
 def inside(roi, x: float, y: float) -> bool:
     return roi is None or cv2.pointPolygonTest(roi, (float(x), float(y)), False) >= 0
+
+
+def draw(frame, roi, zone_mask, boxes, label: str):
+    """Кадр для annotated.mp4: всё вне зоны затемнено, рамки только у машин в зоне."""
+    vis = frame.copy()
+    if roi is not None:
+        vis = cv2.convertScaleAbs(frame, alpha=0.35)
+        cv2.copyTo(frame, zone_mask, vis)  # внутри зоны — исходная яркость
+        cv2.polylines(vis, [roi], True, (0, 220, 255), 3)
+        x0, y0 = roi[:, 0].min(), roi[:, 1].min()
+        ty = int(y0) - 10 if y0 > 40 else int(y0) + 28  # подпись над зоной, если сверху есть место
+        cv2.putText(vis, "PARKING ZONE (counted)", (int(x0) + 4, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 220, 255), 2)
+    for (x1, y1, x2, y2), tid, cls in boxes:
+        p1, p2 = (int(x1), int(y1)), (int(x2), int(y2))
+        cv2.rectangle(vis, p1, p2, (60, 200, 60), 2)
+        text = f"#{tid} {VEHICLE_CLASSES.get(cls, '')}" if tid is not None else VEHICLE_CLASSES.get(cls, "")
+        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+        cv2.rectangle(vis, (p1[0], p1[1] - th - 6), (p1[0] + tw + 6, p1[1]), (60, 200, 60), -1)
+        cv2.putText(vis, text, (p1[0] + 3, p1[1] - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+    (tw, _), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
+    cv2.rectangle(vis, (10, 10), (26 + tw, 52), (0, 0, 0), -1)
+    cv2.putText(vis, label, (18, 42), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+    return vis
 
 
 def run(args) -> Path:
@@ -69,6 +93,10 @@ def run(args) -> Path:
     w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     roi = parse_roi(args.roi, w, h)
+    zone_mask = None
+    if roi is not None:
+        zone_mask = np.zeros((h, w), np.uint8)
+        cv2.fillPoly(zone_mask, [roi], 255)
 
     out_dir = Path(args.out) / src.stem
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -94,14 +122,16 @@ def run(args) -> Path:
         boxes = res.boxes
         xyxy = boxes.xyxy.cpu().numpy() if len(boxes) else np.empty((0, 4))
         ids = boxes.id.int().cpu().tolist() if boxes.id is not None else [None] * len(xyxy)
+        classes = boxes.cls.int().cpu().tolist() if len(boxes) else []
 
-        in_roi = 0
-        for (x1, y1, x2, y2), tid in zip(xyxy, ids):
-            cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-            if inside(roi, cx, cy):
-                in_roi += 1
+        zone_boxes = []
+        for box, tid, cls in zip(xyxy, ids, classes):
+            x1, y1, x2, y2 = box
+            if inside(roi, (x1 + x2) / 2, (y1 + y2) / 2):
+                zone_boxes.append((box, tid, cls))
                 if tid is not None:
                     seen_ids.add(tid)
+        in_roi = len(zone_boxes)
 
         rows.append({
             "frame": frame_idx,
@@ -112,13 +142,10 @@ def run(args) -> Path:
         })
 
         # кадр с рамками + счётчик
-        vis = res.plot(line_width=2, font_size=10)
-        if roi is not None:
-            cv2.polylines(vis, [roi], True, (0, 220, 255), 2)
-        label = f"Cars: {in_roi}" + (f" / {args.capacity}  ({in_roi / args.capacity:.0%})" if args.capacity else "")
-        cv2.rectangle(vis, (10, 10), (10 + 16 * len(label), 52), (0, 0, 0), -1)
-        cv2.putText(vis, label, (18, 42), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
-        writer.write(vis)
+        label = ("Cars in zone: " if roi is not None else "Cars: ") + str(in_roi)
+        if args.capacity:
+            label += f" / {args.capacity}  ({in_roi / args.capacity:.0%})"
+        writer.write(draw(frame, roi, zone_mask, zone_boxes, label))
 
         if len(rows) % 50 == 0:
             speed = len(rows) / (time.time() - t0)

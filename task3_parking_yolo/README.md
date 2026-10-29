@@ -65,7 +65,8 @@ python count_cars.py --source videos/parking.mp4 --model yolov8s.pt --imgsz 1280
 ```
 
 Результаты появятся в `out/<имя_видео>/`: `annotated.mp4`, `counts.csv`,
-`occupancy.png`, `summary.json`.
+`occupancy.png`, `summary.json`. Если задана зона (`--roi`), на `annotated.mp4` всё вне неё затемнено,
+а рамки с ID нарисованы только у машин, которые попали в подсчёт.
 
 Ориентировочная скорость YOLOv8n на видео 720p: GPU NVIDIA — 50–150 кадров/с,
 Apple M1–M3 — 20–40, обычный процессор — 5–15.
