@@ -51,7 +51,9 @@ def extract(args):
         print(f"Набор кадров изменился, прежняя разметка сохранена в {backup}")
     if not gt.exists():
         pd.DataFrame({"frame": picks, "true_count": ""}).to_csv(gt, index=False)
-    print(f"Кадры: {frames_dir}\nЗаполните true_count в {gt}")
+    print(f"Кадры: {frames_dir}")
+    if pd.read_csv(gt)["true_count"].isna().any():
+        print(f"Заполните true_count в {gt}")
 
 
 def score(args):

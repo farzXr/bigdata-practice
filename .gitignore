@@ -9,13 +9,15 @@ venv/
 task1_stream_sentiment/data/*
 !task1_stream_sentiment/data/.gitkeep
 task2_occupancy_ml/data/
-task3_parking_yolo/videos/
+task3_parking_yolo/videos/*
 task3_parking_yolo/out/
 task3_parking_yolo/runs/
 *.pt
 *.mp4
 *.avi
 *.mov
+# демонстрационное видео для задания 3 (≈4 МБ) хранится в репозитории
+!task3_parking_yolo/videos/parking.mp4
 
 # IDE / OS
 .idea/
